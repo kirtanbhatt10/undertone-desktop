@@ -3,6 +3,7 @@
   <h1>Undertone</h1>
   <p><strong>A quiet, floating desktop AI assistant for meetings, interviews, presentations and deep work.</strong></p>
   <p>Electron · React · TypeScript · local-first · MIT</p>
+  <p><a href="https://github.com/kirtanbhatt10/undertone-desktop/actions/workflows/ci.yml"><img src="https://github.com/kirtanbhatt10/undertone-desktop/actions/workflows/ci.yml/badge.svg" alt="CI status" /></a></p>
   <p>
     <a href="#quick-start">Quick start</a> ·
     <a href="#features">Features</a> ·
@@ -20,9 +21,9 @@ global shortcut, capture a region of your screen to ask about it, run a meeting 
 running transcript into summaries, decisions and action items, and switch on **Privacy Mode** so the
 assistant window stays out of your screen share.
 
-> **Status: 0.1.0, early.** Developed and automatically tested on Linux; Windows is the primary
-> target and the Windows build is produced, but it has **not yet been run on a real Windows machine**.
-> See [Verification status](#verification-status) for exactly what has and has not been checked.
+> **Status: 0.1.0, early.** The full test suite — including the Privacy Mode capture test — runs on
+> Windows and Linux in CI on every push. It has not yet been used day-to-day on a physical Windows
+> machine. See [Verification status](#verification-status) for exactly what has and has not been checked.
 
 ## Contents
 
@@ -217,32 +218,39 @@ On Linux without a display, prefix the e2e commands with `xvfb-run -a`.
 
 ## Verification status
 
-Being precise about what was actually checked for 0.1.0:
+Being precise about what was actually checked for 0.1.0. "CI" means the automated suite driving the
+real app on GitHub-hosted runners: `windows-latest` (Windows build 10.0.26100) and `ubuntu-latest`.
 
-| Area | Linux (automated, real app) | Windows |
+| Area | Windows (CI) | Linux (CI + local) |
 | --- | --- | --- |
-| App starts, UI loads, no crash without API config | ✅ | not yet run |
-| Chat, streaming, stop, regenerate, copy, Markdown/code | ✅ | not yet run |
-| Context passed to the model | ✅ (asserted on the outgoing request) | not yet run |
-| OpenAI-compatible provider over real HTTP + SSE | ✅ against a local server | not yet run |
-| Anthropic provider | ✅ unit-tested with recorded stream format; **not called live** | same |
-| Meeting mode, history, settings, persistence, reset | ✅ | not yet run |
-| Global shortcuts | ✅ real key presses injected at the X server | registration logic only |
-| Region capture and image attach | ✅ | not yet run |
-| Microphone dictation flow | ✅ with Chromium's fake audio device and the mock transcriber | not yet run |
-| Privacy Mode toggle, indicator, persistence | ✅ | not yet run |
-| Privacy Mode actually excluding the window from capture | n/a — unsupported on Linux, and the self-test correctly reports "exposed" | **not yet verified** — run `npm run test:privacy` |
-| Production build | ✅ | — |
-| Package | ✅ built and launched | ✅ built (cross-packaged), **not launched** |
-| `npm install` from a clean clone | ⚠️ not exercised (see below) | ⚠️ |
+| Clean `npm install`, typecheck, unit tests | ✅ | ✅ |
+| App starts, UI loads, no crash without API config | ✅ | ✅ |
+| Chat, streaming, stop, regenerate, copy, Markdown/code | ✅ | ✅ |
+| Context passed to the model (asserted on the outgoing request) | ✅ | ✅ |
+| OpenAI-compatible provider over real HTTP + SSE (local server) | ✅ | ✅ |
+| Meeting mode, history, settings, persistence, reset | ✅ | ✅ |
+| Region capture and image attach | ✅ | ✅ |
+| Microphone dictation flow (fake audio device, mock transcriber) | ✅ | ✅ |
+| Global shortcuts | ✅ registration, rebinding, conflicts — key presses not injected | ✅ including real key presses at the X server |
+| Privacy Mode toggle, indicator, persistence | ✅ | ✅ |
+| **Privacy Mode excludes the window from an OS screen capture** | ✅ OS reports the window as protected and it is absent from the capture; the control case (off ⇒ captured) passes | n/a — unsupported, and the app reports "exposed" |
+| Production build | ✅ | ✅ |
+| Portable package | built (cross-packaged from Linux), **not launched** | ✅ built and launched |
 
-The project was first built in a sandbox with no access to the npm registry, so dependencies were
-taken from a local toolchain and Electron from its official GitHub release. Consequences:
-there is **no `package-lock.json`** yet (run `npm install` once and commit the lockfile), `npm audit`
-has not been run, and the renderer was type-checked against a hand-written stand-in for
-`@types/react`, so `npm run typecheck` may surface minor type errors on first run with the real types.
-The CI workflow in `.github/workflows/ci.yml` runs the full suite, including the Privacy Mode test,
-on `windows-latest` — its first run is the first real Windows verification.
+Not verified:
+
+- **A physical Windows desktop.** The Windows results come from a CI virtual machine. Nobody has yet
+  used the app by hand on Windows, so visual polish, the tray, DPI scaling and multi-monitor
+  behaviour are unchecked there.
+- **Specific capture tools.** The Privacy Mode test captures through Electron's `desktopCapturer`
+  (the Windows Graphics Capture / DXGI path). Teams, Zoom, Meet, OBS, Snipping Tool and the GDI
+  path were not individually tested — try yours before relying on it.
+- **Anthropic provider against the live API** (unit-tested against the documented stream format
+  only), and live transcription against a real endpoint.
+- **macOS** — untested, and not packaged.
+- `scripts/privacy-check.ps1` has not been executed.
+- There is **no `package-lock.json`** yet (the project was bootstrapped without registry access);
+  run `npm install` and commit the lockfile. `npm audit` runs in CI but its result is advisory.
 
 ## Security notes
 
@@ -257,7 +265,7 @@ See [SECURITY.md](SECURITY.md) for the review checklist and how to report a vuln
 
 ## Known limitations
 
-- **Not yet run on Windows or macOS** (see above). macOS packaging is not implemented.
+- Verified on Windows in CI only, not yet on a physical Windows desktop; macOS is untested and not packaged (see above).
 - Privacy Mode cannot protect against cameras, capture cards, remote-desktop tools, virtual machine
   hosts, or software that does not go through the OS compositor's capture path; on Linux it is unavailable.
 - Live transcription is microphone-only (your side of the conversation) in ~20-second clips, and needs an
@@ -270,7 +278,7 @@ See [SECURITY.md](SECURITY.md) for the review checklist and how to report a vuln
 
 ## Roadmap
 
-- [ ] First verified Windows release; commit `package-lock.json`; `npm audit` in CI
+- [ ] Hands-on Windows release testing (DPI, tray, multi-monitor, real meeting apps); commit `package-lock.json`
 - [ ] Signed installer (NSIS / MSIX), auto-update, branded executable icon, Electron fuses
 - [ ] macOS build with a ScreenCaptureKit-aware privacy story
 - [ ] PDF / DOCX import into context
