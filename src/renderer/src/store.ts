@@ -153,11 +153,18 @@ function stream(request: Omit<AiChatRequest, 'requestId'>, requestId: string, on
 // Boot
 // ------------------------------------------------------------------------------------------------
 
+/**
+ * Below this width the context panel becomes a drawer over the content (see styles.css), so it
+ * starts closed there instead of covering the assistant on small screens.
+ */
+const CONTEXT_DOCK_WIDTH = 1100;
+const roomForContext = (compact: boolean): boolean => !compact && window.innerWidth >= CONTEXT_DOCK_WIDTH;
+
 export async function boot(): Promise<void> {
   api.onState((app) => {
     // The context panel would cover the whole compact window, so it follows the layout.
     const was = state.app?.settings.compact;
-    set(was !== undefined && was !== app.settings.compact ? { app, contextOpen: !app.settings.compact } : { app });
+    set(was !== undefined && was !== app.settings.compact ? { app, contextOpen: roomForContext(app.settings.compact) } : { app });
   });
   api.onAiEvent(handleAiEvent);
   api.onCommand((cmd) => {
@@ -188,7 +195,7 @@ export async function boot(): Promise<void> {
     }
   });
   const app = await api.getState();
-  set({ app, contextOpen: !app.settings.compact });
+  set({ app, contextOpen: roomForContext(app.settings.compact) });
   await Promise.all([refreshConversations(), refreshMeetings()]);
 }
 
@@ -216,7 +223,7 @@ export function toggleContext(open?: boolean): void {
 
 export async function updateSettings(patch: SettingsPatch): Promise<boolean> {
   const app = await guard(() => api.updateSettings(patch));
-  if (app) set(patch.compact !== undefined ? { app, contextOpen: !app.settings.compact } : { app });
+  if (app) set(patch.compact !== undefined ? { app, contextOpen: roomForContext(app.settings.compact) } : { app });
   return !!app;
 }
 

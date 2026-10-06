@@ -417,9 +417,10 @@ textarea { resize: none; line-height: 1.5; }
 }
 /* The meeting layout follows the space the main area actually has, not the window width. */
 @container main (max-width: 760px) {
-  .meeting-grid { grid-template-columns: 1fr; overflow-y: auto; align-content: start; }
-  .meeting-col { overflow: visible; }
-  .card.grow { min-height: 320px; }
+  /* One scrolling column: block layout so each card keeps its natural height. */
+  .meeting-grid { display: block; overflow-y: auto; }
+  .meeting-col { overflow: visible; min-height: auto; margin-bottom: 14px; }
+  .card.grow { flex: none; height: 360px; min-height: 0; }
   .starters { grid-template-columns: 1fr; }
 }
 
