@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Build output and packages
+out/
+release/
+dist/
+.cache/
+
+# Secrets and local configuration — never commit these
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.json
+
+# Local app data (conversations, meetings, settings) if pointed inside the repo
+/data/
+/userdata/
+*.local.json
+
+# Logs and test artefacts
+logs/
+*.log
+test-results/
+playwright-report/
+coverage/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp

@@ -1,0 +1,54 @@
+{
+  "name": "undertone",
+  "productName": "Undertone",
+  "version": "0.1.0",
+  "description": "A quiet, floating desktop AI assistant for meetings, interviews, presentations and deep work.",
+  "author": "Undertone contributors",
+  "license": "MIT",
+  "private": true,
+  "main": "out/main/index.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "npm run build && electron .",
+    "dev": "node scripts/build.mjs --watch --launch",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "npm run test:unit",
+    "test:unit": "node --import tsx --test \"tests/unit/**/*.test.ts\"",
+    "test:e2e": "npm run build && node --import tsx --test --test-concurrency=1 \"tests/e2e/**/*.test.ts\"",
+    "test:privacy": "npm run build && node --import tsx --test tests/e2e/privacy.test.ts",
+    "package": "npm run build && node scripts/package.mjs",
+    "package:win": "npm run build && node scripts/package.mjs --platform win32",
+    "package:linux": "npm run build && node scripts/package.mjs --platform linux",
+    "scan:secrets": "node scripts/secret-scan.mjs",
+    "screenshots": "npm run build && node --import tsx --test tests/e2e/provider.test.ts"
+  },
+  "dependencies": {
+    "dompurify": "^3.2.0",
+    "highlight.js": "^11.10.0",
+    "marked": "^18.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "electron": "40.4.0",
+    "esbuild": "^0.28.0",
+    "playwright": "^1.56.0",
+    "tsx": "^4.19.0",
+    "typescript": "^6.0.0"
+  },
+  "keywords": [
+    "electron",
+    "desktop",
+    "ai-assistant",
+    "meeting-assistant",
+    "react",
+    "typescript"
+  ]
+}
