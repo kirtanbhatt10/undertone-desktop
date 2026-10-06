@@ -229,7 +229,7 @@ describe('Undertone desktop app', { timeout: 240_000 }, () => {
     await win.fill('[data-testid=api-key]', 'sk-e2e-not-a-real-key-000000');
     await win.click('[data-testid=save-key]');
     await win.waitForFunction(() => !/Not configured/.test(document.querySelector('[data-testid=key-status]')?.textContent ?? ''));
-    assert.equal(await win.locator('[data-testid=api-key]').inputValue(), '');
+    await win.waitForFunction(() => (document.querySelector('[data-testid=api-key]') as HTMLInputElement).value === '', undefined, { timeout: 10_000 });
     assert.ok(!(await win.content()).includes('sk-e2e-not-a-real-key'), 'key is not present anywhere in the renderer');
     assert.match(await win.locator('[data-testid=provider-chip]').innerText(), /OpenAI/);
 
