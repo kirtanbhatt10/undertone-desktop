@@ -250,7 +250,10 @@ describe('Undertone desktop app', { timeout: 240_000 }, () => {
 
     // No key material in settings, secrets or logs on disk.
     const dump = (dir: string): string => fs.readdirSync(dir, { recursive: true, withFileTypes: true }).filter((d) => d.isFile()).map((d) => fs.readFileSync(path.join(d.parentPath, d.name), 'utf8')).join('\n');
-    assert.ok(!dump(ctx.userData).includes('sk-e2e-not-a-real-key'), 'key never written to disk in plaintext');
+    // Only the app's own files: Chromium keeps its profile databases locked on Windows while running.
+    const written = ['data', 'logs'].map((d) => path.join(ctx.userData, d)).filter((d) => fs.existsSync(d)).map(dump).join('\n');
+    assert.ok(written.length > 0);
+    assert.ok(!written.includes('sk-e2e-not-a-real-key'), 'key never written to disk in plaintext');
   });
 
   test('shortcuts are registered, configurable and fire globally', async (t) => {
