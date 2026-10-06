@@ -140,16 +140,19 @@ the shared picture on a second device.
 | --- | --- |
 | Capability detection for every platform / build | ✅ unit-tested |
 | Probe analysis and verdict logic | ✅ unit-tested |
-| Control case: unprotected window is detected in an OS capture | ✅ on Linux (real app) |
-| Honest "unsupported / exposed" reporting | ✅ on Linux (real app) |
-| Toggle, indicator, persistence, global shortcut | ✅ on Linux (real app, real key presses) |
-| **Window actually excluded from capture on Windows** | ❌ **not yet verified** — the project was built on Linux |
+| Control case: an unprotected window is detected in an OS capture | ✅ Windows and Linux (real app, CI) |
+| **Window excluded from an OS screen capture on Windows** | ✅ `windows-latest` CI runner, Windows build 10.0.26100: the OS reports the window as content-protected and it is absent from a capture taken through Electron's `desktopCapturer` (Windows Graphics Capture / DXGI) |
+| Protection still applied after restart, and removed when switched off | ✅ Windows and Linux (CI) |
+| Honest "unsupported / exposed" reporting | ✅ Linux (real app) |
+| Toggle by global shortcut with real key presses | ✅ Linux only |
+| Individual capture tools (Teams, Zoom, Meet, OBS, Snipping Tool), GDI path | ❌ not individually tested |
+| A physical Windows machine, older Windows builds (`WDA_MONITOR` fallback) | ❌ not tested |
 | `scripts/privacy-check.ps1` | ❌ not yet executed |
 | macOS | ❌ not tested |
 
-The Windows exclusion relies on a long-standing, documented OS feature that Electron exposes
-directly, so it is expected to work — but "expected" is not "verified". Run `npm run test:privacy`
-on a Windows machine (the CI workflow does this on `windows-latest`) before depending on it.
+So: the mechanism is confirmed to work on current Windows for the capture path that screen-sharing
+apps are built on, on a CI virtual machine. That is good evidence, not a guarantee for every tool —
+run the in-app self-test, and check your own meeting app once, before depending on it.
 
 ## Responsible use
 
