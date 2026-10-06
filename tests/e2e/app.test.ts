@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, before, describe, test } from 'node:test';
-import { type Launched, canPressGlobalKeys, launch, mainBounds, pressCtrlAlt, send, sleep, tempUserData } from './helpers';
+import { type Launched, canPressGlobalKeys, closeContextIfDrawer, launch, mainBounds, openContext, pressCtrlAlt, send, sleep, tempUserData } from './helpers';
 
 describe('Undertone desktop app', { timeout: 240_000 }, () => {
   let ctx: Launched;
@@ -54,11 +54,13 @@ describe('Undertone desktop app', { timeout: 240_000 }, () => {
 
   test('context panel content reaches the model', async () => {
     const { win } = ctx;
+    await openContext(win);
     await win.fill('[data-testid=ctx-topic]', 'Series A investor update');
     await win.fill('[data-testid=ctx-role]', 'Head of Product');
     await win.fill('[data-testid=ctx-instructions]', 'Answer in British English');
     await win.waitForFunction(() => document.querySelector('[data-testid=context-chip]')?.textContent?.includes('Context · 3'));
     await sleep(500); // debounce before the context is persisted in the main process
+    await closeContextIfDrawer(win);
     const reply = await send(win, 'What should I open with?');
     assert.match(reply, /topic: Series A investor update/);
     assert.match(reply, /role: Head of Product/);
@@ -66,11 +68,15 @@ describe('Undertone desktop app', { timeout: 240_000 }, () => {
     assert.match(reply, /Messages in this conversation: 3/);
 
     // Pausing context stops it being sent.
-    await win.getByRole('switch', { name: 'Use context' }).click();
-    await sleep(500);
+    const toggleUse = async (): Promise<void> => {
+      await openContext(win);
+      await win.getByRole('switch', { name: 'Use context' }).click();
+      await sleep(500);
+      await closeContextIfDrawer(win);
+    };
+    await toggleUse();
     assert.match(await send(win, 'And now?'), /Context received: none/);
-    await win.getByRole('switch', { name: 'Use context' }).click();
-    await sleep(500);
+    await toggleUse();
   });
 
   test('copy, regenerate and stop work', async () => {
@@ -209,7 +215,7 @@ describe('Undertone desktop app', { timeout: 240_000 }, () => {
     await win.fill('[data-testid=max-tokens]', '5');
     await win.press('[data-testid=max-tokens]', 'Enter');
     await win.waitForSelector('[data-testid=toast]');
-    assert.equal(await win.locator('[data-testid=max-tokens]').inputValue(), '2048');
+    await win.waitForFunction(() => (document.querySelector('[data-testid=max-tokens]') as HTMLInputElement).value === '2048');
 
     await win.getByRole('radio', { name: 'OpenAI-compatible' }).click();
     await win.fill('[data-testid=base-url]', 'http://example.com/v1');
@@ -337,7 +343,9 @@ describe('Undertone desktop app', { timeout: 240_000 }, () => {
     ctx = await launch({ userData });
     const { win } = ctx;
     assert.ok((await win.locator('[data-testid=recent-list] .side-item').count()) >= 2, 'history restored');
+    await openContext(win);
     assert.equal(await win.locator('[data-testid=ctx-topic]').inputValue(), 'Series A investor update', 'context restored');
+    await closeContextIfDrawer(win);
     await win.click('[data-testid=nav-settings]');
     assert.equal(await win.getByRole('radio', { name: 'Concise' }).getAttribute('aria-checked'), 'true');
     assert.equal(await win.getByRole('radio', { name: 'Mock', exact: true }).getAttribute('aria-checked'), 'true');
@@ -345,6 +353,7 @@ describe('Undertone desktop app', { timeout: 240_000 }, () => {
     await win.click('[data-testid=reset-data]');
     await win.click('[data-testid=confirm]');
     await win.waitForFunction(() => document.querySelectorAll('[data-testid=recent-list] .side-item').length === 0);
+    await openContext(win);
     assert.equal(await win.locator('[data-testid=ctx-topic]').inputValue(), '');
     assert.equal(fs.existsSync(path.join(userData, 'data', 'conversations')), false);
     assert.equal(fs.existsSync(path.join(userData, 'data', 'meetings')), false);

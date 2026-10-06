@@ -62,6 +62,21 @@ export async function send(win: Page, text: string): Promise<string> {
   return reply.innerText();
 }
 
+/** Makes sure the context panel is showing (it starts closed when the window is narrow). */
+export async function openContext(win: Page): Promise<void> {
+  if ((await win.locator('[data-testid=context-panel]').count()) === 0) await win.click('[data-testid=toggle-context]');
+  await win.waitForSelector('[data-testid=context-panel]');
+}
+
+/** On narrow windows the panel is a drawer over the content; close it again so it does not cover what the test clicks next. */
+export async function closeContextIfDrawer(win: Page): Promise<void> {
+  const drawer = await win.evaluate(() => window.innerWidth < 1100);
+  if (drawer && (await win.locator('[data-testid=context-panel]').count()) > 0) {
+    await win.click('[data-testid=toggle-context]');
+    await win.waitForFunction(() => !document.querySelector('[data-testid=context-panel]'));
+  }
+}
+
 /** True when real key presses can be injected at the OS level (X11 + XTest). */
 export function canPressGlobalKeys(): boolean {
   if (process.platform !== 'linux' || !process.env.DISPLAY) return false;

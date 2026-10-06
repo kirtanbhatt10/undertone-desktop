@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { after, before, describe, test } from 'node:test';
 import { startFakeProvider } from './fakeProvider';
-import { type Launched, launch, send, shot, sleep } from './helpers';
+import { type Launched, closeContextIfDrawer, launch, openContext, send, shot, sleep } from './helpers';
 
 describe('OpenAI-compatible provider over real HTTP', { timeout: 240_000 }, () => {
   let ctx: Launched;
@@ -53,10 +53,12 @@ describe('OpenAI-compatible provider over real HTTP', { timeout: 240_000 }, () =
     assert.equal(await win.locator('[data-testid=mock-banner]').count(), 0);
 
     await win.click('[data-testid=new-chat]');
+    await openContext(win);
     await win.fill('[data-testid=ctx-topic]', 'Q3 roadmap review with the platform team');
     await win.fill('[data-testid=ctx-role]', 'Product lead presenting to engineering leadership');
     await win.fill('[data-testid=ctx-notes]', 'Last quarter: 9 of 11 commitments shipped. Two enterprise renewals depend on billing.');
     await sleep(500);
+    await closeContextIfDrawer(win);
     const reply = await send(win, 'How should I open the meeting?');
     assert.match(reply, /Open with the outcome, not the agenda/);
     assert.match(reply, /Keep it under ninety seconds/);
@@ -111,7 +113,7 @@ describe('OpenAI-compatible provider over real HTTP', { timeout: 240_000 }, () =
     await win.fill('[data-testid=meeting-question]', 'When do we ship?');
     await win.press('[data-testid=meeting-question]', 'Enter');
     await win.waitForFunction(() => /Friday\. The beta ships then/.test(document.querySelector('[data-testid=qa-list]')?.textContent ?? ''), undefined, { timeout: 30_000 });
-    await win.click('[data-testid=toggle-context]');
+    if ((await win.locator('[data-testid=context-panel]').count()) > 0) await win.click('[data-testid=toggle-context]');
     await win.locator('[data-testid=transcript]').evaluate((el) => el.scrollIntoView({ block: 'start' }));
     await sleep(2200);
     await shot(win, 'meeting');
