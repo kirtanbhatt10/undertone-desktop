@@ -1,0 +1,11 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #000; cursor: crosshair; user-select: none; font: 13px/1.4 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+#shot { position: fixed; inset: 0; width: 100vw; height: 100vh; object-fit: fill; pointer-events: none; }
+#shade { position: fixed; inset: 0; background: rgba(8, 9, 12, 0.38); pointer-events: none; }
+#selection { position: fixed; border: 1.5px solid #ffb37a; border-radius: 3px; box-shadow: 0 0 0 100vmax rgba(8, 9, 12, 0.38); background: transparent; pointer-events: none; }
+#selection:not([hidden]) ~ #hint { opacity: 0; }
+body:has(#selection:not([hidden])) #shade { display: none; }
+#size { position: absolute; left: 0; top: -26px; padding: 2px 8px; border-radius: 6px; background: #ffb37a; color: #1b1206; font-weight: 600; font-size: 12px; white-space: nowrap; }
+#hint { position: fixed; left: 50%; top: 28px; transform: translateX(-50%); padding: 9px 16px; border-radius: 999px; background: rgba(13, 14, 18, 0.92); color: #eceef3; border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); transition: opacity 0.15s; pointer-events: none; }
+#hint.dim { opacity: 0; }
+kbd { font: inherit; font-weight: 600; padding: 1px 6px; border-radius: 5px; background: rgba(255, 255, 255, 0.1); }
