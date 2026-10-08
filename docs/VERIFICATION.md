@@ -20,9 +20,19 @@ real app on GitHub-hosted runners: `windows-latest` (Windows build 10.0.26100) a
 | Privacy Mode toggle, indicator, persistence | ✅ | ✅ |
 | **Privacy Mode excludes the window from an OS screen capture** | ✅ OS reports the window as protected and it is absent from the capture; the control case (off ⇒ captured) passes | n/a — unsupported, and the app reports "exposed" |
 | Production build | ✅ | ✅ |
-| Portable package | built (cross-packaged from Linux), **not launched** | ✅ built and launched |
+| Portable package | ✅ cross-packaged from Linux, unzipped and started on `windows-latest` | ✅ built and launched |
+| Installer | ✅ NSIS setup program: silent install, files, shortcut and "Installed apps" entry checked, app started, silent uninstall leaves user data | ✅ `.deb`: installed with `apt`, app started on a virtual display, removed |
+
+"Started" for the packaged builds means the process was still running after 20 seconds and had
+created its data folder; the feature tests above run against the unpackaged build. The checks live
+in [`.github/workflows/release.yml`](../.github/workflows/release.yml) and run before every release.
 
 Not verified:
+
+- **The installer's interactive pages.** CI installs silently (`/S`); nobody has clicked through
+  the setup wizard on a real desktop yet. Upgrading over an older version is also untested, since
+  0.1.0 is the first release.
+- **Linux distributions other than Ubuntu.** The `.deb` was installed on `ubuntu-latest` only.
 
 - **A physical Windows desktop.** The Windows results come from a CI virtual machine. Nobody has yet
   used the app by hand on Windows, so visual polish, the tray, DPI scaling and multi-monitor
@@ -45,7 +55,10 @@ Not verified:
 - Live transcription is microphone-only (your side of the conversation) in ~20-second clips, and needs an
   OpenAI-compatible transcription endpoint. System/loopback audio is not captured.
 - Documents are plain text; PDF and Word files must be pasted as text.
-- Portable builds only: no installer, auto-update or code signing, and the Windows `.exe` keeps the
-  stock Electron file icon (the window and taskbar icon are Undertone's).
+- No code signing or auto-update: Windows SmartScreen warns on first run, and new versions are
+  installed by hand. The Windows `.exe` keeps the stock Electron file icon (the shortcuts, window
+  and taskbar use Undertone's).
+- Close Undertone (tray → Quit) before running the Windows installer over an existing install; the
+  installer does not stop a running copy for you.
 - "Launch at login" applies only to packaged builds on Windows and macOS.
 - Conversations are sent in full each turn; very long chats can exceed a model's context window.
