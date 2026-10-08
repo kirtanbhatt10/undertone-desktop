@@ -61,8 +61,12 @@ function pick(body: RecordedRequest['body']): string {
   return CHAT;
 }
 
-/** A tiny local server that speaks the OpenAI Chat Completions streaming protocol. */
-export async function startFakeProvider(): Promise<{ url: string; requests: RecordedRequest[]; close(): Promise<void> }> {
+/**
+ * A tiny local server that speaks the OpenAI Chat Completions streaming protocol.
+ * `pieceDelayMs` is the pause between streamed chunks: fast for tests, slower when recording the demo.
+ */
+export async function startFakeProvider(opts: { pieceDelayMs?: number } = {}): Promise<{ url: string; requests: RecordedRequest[]; close(): Promise<void> }> {
+  const pieceDelayMs = opts.pieceDelayMs ?? 6;
   const requests: RecordedRequest[] = [];
   const server = http.createServer((req, res) => {
     let raw = '';
@@ -89,7 +93,7 @@ export async function startFakeProvider(): Promise<{ url: string; requests: Reco
           return res.end();
         }
         res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: pieces[i++] } }] })}\n\n`);
-      }, 6);
+      }, pieceDelayMs);
       res.on('close', () => clearInterval(timer));
     });
   });
