@@ -1,0 +1,209 @@
+name: Release
+
+# Builds the Windows and Linux installers, installs and starts each one on a clean runner, and only
+# then publishes a GitHub release.
+#
+#   - Pull requests that touch packaging: build and verify only.
+#   - "Run workflow" on main: build and verify; tick "publish" to also tag and release.
+#   - Pushing a tag like v0.2.0: build, verify and release under that tag.
+#
+# The version comes from package.json, and the notes from docs/releases/v<version>.md.
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - scripts/build.mjs
+      - scripts/package.mjs
+      - scripts/installer.mjs
+      - resources/**
+      - package.json
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Create the tag and publish the GitHub release (main only)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build installers
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Install NSIS
+        run: sudo apt-get update && sudo apt-get install -y nsis
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - name: Package (Linux and Windows, x64)
+        run: |
+          node scripts/package.mjs --platform linux
+          node scripts/package.mjs --platform win32
+      - name: Build installers
+        run: |
+          node scripts/installer.mjs --platform linux
+          node scripts/installer.mjs --platform win32
+      - name: Collect release files and checksums
+        run: |
+          mkdir dist
+          cp release/*.zip release/*.deb release/*-Setup-*.exe dist/
+          cd dist
+          sha256sum * > SHA256SUMS.txt
+          ls -l
+          cat SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: undertone-${{ steps.version.outputs.version }}
+          path: dist/
+          compression-level: 0
+          if-no-files-found: error
+
+  verify-windows:
+    name: Install and start on Windows
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: undertone-${{ needs.build.outputs.version }}
+          path: dist
+      - name: Silent install, start, uninstall
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = Get-ChildItem dist -Filter 'Undertone-Setup-*.exe' | Select-Object -First 1
+          if (-not $setup) { throw 'Setup program not found in the build output.' }
+
+          $expected = (Select-String -Path dist/SHA256SUMS.txt -Pattern ([regex]::Escape($setup.Name))).Line.Split(' ')[0]
+          $actual = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLower()
+          if ($expected -ne $actual) { throw "Checksum mismatch for $($setup.Name)" }
+
+          $install = Start-Process $setup.FullName -ArgumentList '/S' -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Installer exited with code $($install.ExitCode)" }
+
+          $dir = Join-Path $env:LOCALAPPDATA 'Programs\Undertone'
+          foreach ($f in 'Undertone.exe', 'Uninstall.exe', 'icon.ico', 'resources\app\package.json', 'resources\app\out\main\index.js') {
+            if (-not (Test-Path (Join-Path $dir $f))) { throw "Missing after install: $f" }
+          }
+          $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Undertone.lnk'
+          if (-not (Test-Path $startMenu)) { throw 'Start menu shortcut was not created.' }
+          $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Undertone'
+          $shown = (Get-ItemProperty $key).DisplayVersion
+          if ($shown -ne $env:VERSION) { throw "Installed apps entry shows version '$shown', expected '$env:VERSION'" }
+          Write-Host "Installed to $dir"
+
+          $env:UNDERTONE_USER_DATA = Join-Path $env:RUNNER_TEMP 'undertone-data'
+          $app = Start-Process (Join-Path $dir 'Undertone.exe') -PassThru
+          Start-Sleep -Seconds 20
+          if ($app.HasExited) { throw "Undertone exited on start with code $($app.ExitCode)" }
+          if (-not (Test-Path (Join-Path $env:UNDERTONE_USER_DATA 'logs'))) { throw 'The app started but never initialised its data folder.' }
+          Write-Host "Undertone is running ($((Get-Process Undertone).Count) processes)"
+          Get-Process Undertone -ErrorAction SilentlyContinue | Stop-Process -Force
+          Start-Sleep -Seconds 3
+
+          # "_?=" makes the uninstaller run in place and wait, instead of copying itself to %TEMP% and returning.
+          $uninstall = Start-Process (Join-Path $dir 'Uninstall.exe') -ArgumentList '/S', "_?=$dir" -Wait -PassThru
+          if ($uninstall.ExitCode -ne 0) { throw "Uninstaller exited with code $($uninstall.ExitCode)" }
+          if (Test-Path (Join-Path $dir 'Undertone.exe')) { throw 'Undertone.exe is still present after uninstall.' }
+          if (Test-Path $startMenu) { throw 'Start menu shortcut is still present after uninstall.' }
+          if (Test-Path $key) { throw 'Installed apps entry is still present after uninstall.' }
+          if (-not (Test-Path $env:UNDERTONE_USER_DATA)) { throw 'Uninstall removed user data; it must not.' }
+          Write-Host 'Uninstalled cleanly; user data left in place.'
+      - name: Portable zip starts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Get-ChildItem dist -Filter 'Undertone-*-win32-x64.zip' | Select-Object -First 1
+          Expand-Archive $zip.FullName -DestinationPath portable
+          $env:UNDERTONE_USER_DATA = Join-Path $env:RUNNER_TEMP 'undertone-portable-data'
+          $app = Start-Process 'portable\Undertone-win32-x64\Undertone.exe' -PassThru
+          Start-Sleep -Seconds 20
+          if ($app.HasExited) { throw "Portable build exited on start with code $($app.ExitCode)" }
+          if (-not (Test-Path (Join-Path $env:UNDERTONE_USER_DATA 'logs'))) { throw 'The portable build started but never initialised its data folder.' }
+          Get-Process Undertone -ErrorAction SilentlyContinue | Stop-Process -Force
+
+  verify-linux:
+    name: Install and start on Linux
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: undertone-${{ needs.build.outputs.version }}
+          path: dist
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum -c SHA256SUMS.txt
+      - name: Install the .deb, start, remove
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb ./dist/undertone_*_amd64.deb
+          test -x /opt/Undertone/undertone
+          test -u /opt/Undertone/chrome-sandbox
+          test -f /usr/share/applications/undertone.desktop
+          command -v undertone
+
+          export UNDERTONE_USER_DATA="$RUNNER_TEMP/undertone-data"
+          xvfb-run -a -s "-screen 0 1440x900x24" undertone > app.log 2>&1 &
+          sleep 20
+          if ! pgrep -x undertone > /dev/null; then
+            echo "Undertone is not running after 20 seconds:"; cat app.log; exit 1
+          fi
+          test -d "$UNDERTONE_USER_DATA/logs" || { echo "The app started but never initialised its data folder."; cat app.log; exit 1; }
+          echo "Undertone is running ($(pgrep -xc undertone) processes)"
+          pkill -x undertone || true
+          sleep 2
+
+          sudo apt-get remove -y undertone
+          test ! -e /opt/Undertone/undertone
+          test -d "$UNDERTONE_USER_DATA"
+          echo "Removed cleanly; user data left in place."
+
+  publish:
+    name: Publish GitHub release
+    needs: [build, verify-windows, verify-linux]
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: undertone-${{ needs.build.outputs.version }}
+          path: dist
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag="v$VERSION"
+          notes="docs/releases/$tag.md"
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "$tag" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $VERSION."; exit 1
+          fi
+          if [ "$GITHUB_REF_TYPE" = "branch" ] && [ "$GITHUB_REF_NAME" != "main" ]; then
+            echo "Releases are published from main, not $GITHUB_REF_NAME."; exit 1
+          fi
+          test -f "$notes" || { echo "Write $notes before releasing."; exit 1; }
+          gh release create "$tag" dist/* --title "Undertone $tag" --notes-file "$notes" --target "$GITHUB_SHA"
