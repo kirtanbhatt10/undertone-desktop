@@ -33,9 +33,10 @@ interface Frame {
 class Recorder {
   readonly frames: Frame[] = [];
   private running = false;
+  private paused = false;
+  private shot: Promise<unknown> = Promise.resolve();
   private loop: Promise<void> = Promise.resolve();
   private lastHash = '';
-  private endedAt = 0;
 
   constructor(
     private readonly win: Page,
@@ -47,7 +48,9 @@ class Recorder {
     this.loop = (async () => {
       while (this.running) {
         const at = Date.now();
-        const png = await this.win.screenshot({ type: 'png' }).catch(() => null);
+        const pending = this.paused ? null : this.win.screenshot({ type: 'png' }).catch(() => null);
+        if (pending) this.shot = pending;
+        const png = await pending;
         if (png) {
           const hash = createHash('sha1').update(png).digest('hex');
           if (hash !== this.lastHash) {
@@ -63,11 +66,24 @@ class Recorder {
     })();
   }
 
+  /**
+   * Runs `action` with capture suspended. Screenshotting while the OS window is being resized is
+   * racy (a CI run timed out waiting for the resize), so switching compact mode goes through here.
+   */
+  async withoutCapture(action: () => Promise<void>): Promise<void> {
+    this.paused = true;
+    await this.shot;
+    try {
+      await action();
+    } finally {
+      this.paused = false;
+    }
+  }
+
   async stop(): Promise<number> {
     this.running = false;
     await this.loop;
-    this.endedAt = Date.now();
-    return this.endedAt;
+    return Date.now();
   }
 }
 
@@ -207,11 +223,17 @@ async function main(): Promise<void> {
     // 3. Compact floating mode.
     await win.click('[data-testid=nav-assistant]');
     await sleep(500);
-    await win.click('[data-testid=toggle-compact]');
-    await win.waitForFunction(() => window.innerWidth < 500);
+    await recorder.withoutCapture(async () => {
+      await win.click('[data-testid=toggle-compact]');
+      await win.waitForFunction(() => window.innerWidth < 500);
+      await sleep(400);
+    });
     await sleep(2600);
-    await win.click('[data-testid=toggle-compact]');
-    await win.waitForFunction(() => window.innerWidth > 800);
+    await recorder.withoutCapture(async () => {
+      await win.click('[data-testid=toggle-compact]');
+      await win.waitForFunction(() => window.innerWidth > 800);
+      await sleep(400);
+    });
     await sleep(1500);
 
     const endedAt = await recorder.stop();
