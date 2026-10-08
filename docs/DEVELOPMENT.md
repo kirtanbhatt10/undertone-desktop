@@ -35,6 +35,9 @@ unpackaged builds (`Ctrl+Shift+I`).
 | `npm run test:privacy` | Build, then run only the Privacy Mode validation |
 | `npm run screenshots` | Regenerate `docs/screenshots` (set `UNDERTONE_SHOTS=docs/screenshots`) |
 | `npm run package[:win\|:linux]` | Build and package to `release/` |
+| `npm run installer:win` | Windows setup program from the packaged build (needs `makensis`) |
+| `npm run installer:linux` | `.deb` from the packaged build (needs `dpkg-deb`) |
+| `npm run demo` | Re-record `docs/demo.gif` (needs `ffmpeg`) |
 | `npm run scan:secrets` | Scan everything git would commit for credentials |
 
 ## Tests
@@ -68,8 +71,47 @@ downloaded from the Electron GitHub release and checked against `SHASUMS256.txt`
 executable, removes Electron's default app and adds `resources/app` containing only `out/`, the
 icons and a minimal `package.json`.
 
-Not done yet: installer, code signing, executable icon/version resources, ASAR, Electron fuses,
+### Installers
+
+```bash
+npm run package:win && npm run installer:win       # release/Undertone-Setup-<version>-x64.exe
+npm run package:linux && npm run installer:linux   # release/undertone_<version>_amd64.deb
+```
+
+`scripts/installer.mjs` wraps the packaged folder; it does not rebuild anything.
+
+- **Windows** uses NSIS (`sudo apt install nsis`, `brew install makensis` or `choco install nsis`),
+  so the setup program can be built on Linux or macOS as well. It installs per user into
+  `%LOCALAPPDATA%\Programs\Undertone` without administrator rights, adds Start menu and desktop
+  shortcuts and an "Installed apps" entry, and supports silent install and uninstall with `/S`.
+- **Linux** builds a `.deb` that installs to `/opt/Undertone` with a launcher entry, an icon and an
+  `undertone` command.
+- Uninstalling removes the program only. Conversations, settings and saved keys stay in the user
+  data folder (`%APPDATA%\Undertone` or `~/.config/Undertone`).
+
+Not done yet: code signing, auto-update, executable icon/version resources, ASAR, Electron fuses,
 macOS. See the roadmap in the README.
+
+## Releasing
+
+1. Set the version in `package.json` and write `docs/releases/v<version>.md` (it becomes the
+   release notes).
+2. Merge to `main` and wait for CI.
+3. Run the **Release** workflow on `main` with **publish** ticked (or push a `v<version>` tag).
+
+The workflow builds the portable zips and both installers on Linux, then on clean
+`windows-latest` and `ubuntu-latest` runners it checks the SHA-256 sums, installs silently, starts
+the app, confirms it stays up and initialises its data folder, and uninstalls. Only if all of that
+passes does it create the tag and the GitHub release with the files and `SHA256SUMS.txt`. Pull
+requests that touch packaging run the same build and checks without publishing.
+
+## Demo GIF
+
+`npm run demo` drives the real app against the local stand-in model server
+(`tests/e2e/recordDemo.ts`), screenshots the window about ten times a second and encodes the frames
+with their real timing using `ffmpeg`. The **Demo GIF** workflow does the same on a virtual display
+and pushes the result to the `demo-preview` branch so it can be reviewed before it is committed as
+`docs/demo.gif`.
 
 ## Conventions
 

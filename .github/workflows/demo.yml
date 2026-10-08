@@ -1,0 +1,58 @@
+name: Demo GIF
+
+# Records docs/demo.gif by driving the real app (tests/e2e/recordDemo.ts) on a virtual display.
+# The result is attached to the run and pushed to the "demo-preview" branch so it can be looked at
+# in the browser. When it is good, copy it to docs/demo.gif in a normal commit.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/demo.yml
+      - tests/e2e/recordDemo.ts
+      - tests/e2e/fakeProvider.ts
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demo-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  record:
+    name: Record
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg xvfb
+      - run: npm install --no-audit --no-fund
+      - name: Record
+        run: xvfb-run -a -s "-screen 0 1440x900x24" npm run demo
+        env:
+          UNDERTONE_DEMO_OUT: ${{ runner.temp }}/demo.gif
+      - uses: actions/upload-artifact@v4
+        with:
+          name: demo-gif
+          path: ${{ runner.temp }}/demo.gif
+          if-no-files-found: error
+      - name: Push to the demo-preview branch
+        if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          cp "$RUNNER_TEMP/demo.gif" "$work/demo.gif"
+          cd "$work"
+          git init -q -b demo-preview
+          git add demo.gif
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Demo GIF preview recorded from $GITHUB_SHA"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" demo-preview
