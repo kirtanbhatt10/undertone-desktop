@@ -1289,6 +1289,11 @@ tbody th {
 }
 
 .timer.live {
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
   color: var(--live);
 }
 
