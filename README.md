@@ -9,7 +9,12 @@
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT licence" /></a>
   </p>
   <p>
+    <a href="https://kirtanbhatt10.github.io/undertone-desktop/"><strong>Visit the website</strong></a> ·
+    <a href="https://kirtanbhatt10.github.io/undertone-desktop/demo/"><strong>Try the browser demo</strong></a>
+  </p>
+  <p>
     <a href="#download">Download</a> ·
+    <a href="#website-and-browser-demo">Website</a> ·
     <a href="#features">Features</a> ·
     <a href="#screenshots">Screenshots</a> ·
     <a href="#run-from-source">Run from source</a> ·
@@ -85,6 +90,40 @@ until you add an API key in **Settings → AI provider**.
 <sub>The demo GIF and the screenshots are recorded from the real app on Linux against a local stand-in
 model server, which is why Privacy Mode shows as "unsupported" there. Regenerate them with
 `npm run demo` and `UNDERTONE_SHOTS=docs/screenshots npm run screenshots`.</sub>
+
+## Website and browser demo
+
+The project has a website built with **Next.js**, live at **[kirtanbhatt10.github.io/undertone-desktop](https://kirtanbhatt10.github.io/undertone-desktop/)**.
+Its hero shows the idea behind Privacy Mode side by side: your screen, and what the call sees. Flip
+the switch or press <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>P</kbd> and the assistant drops out of the shared view.
+
+![Undertone website: your screen versus what the call sees](docs/screenshots/web-home.jpg)
+
+The **[browser demo](https://kirtanbhatt10.github.io/undertone-desktop/demo/)** rebuilds the app interface for the web so you can try it without
+installing anything: assistant with quick actions and a context panel, meeting mode, history and
+settings. Replies are simulated, as in the desktop app's Mock mode, and nothing leaves your browser.
+
+| Assistant with context | Meeting mode |
+| --- | --- |
+| ![Browser demo: assistant with context panel](docs/screenshots/web-demo-assistant.jpg) | ![Browser demo: meeting transcript and action items](docs/screenshots/web-demo-meeting.jpg) |
+
+<details>
+<summary>Light theme</summary>
+
+![Browser demo: settings in the light theme](docs/screenshots/web-demo-settings-light.jpg)
+
+</details>
+
+The site lives in [`web/`](web/) and is a static export, so it runs anywhere:
+
+```bash
+cd web
+npm install
+npm run dev      # http://localhost:3000
+```
+
+Every push to `main` that touches `web/` rebuilds it and publishes it to GitHub Pages through
+[`.github/workflows/pages.yml`](.github/workflows/pages.yml). More in [web/README.md](web/README.md).
 
 ## Run from source
 
@@ -176,6 +215,7 @@ microphone is used.
 | Rendering model output | marked, DOMPurify, highlight.js |
 | Tests | Node test runner (unit), Playwright (end to end) |
 | CI | GitHub Actions on `windows-latest` and `ubuntu-latest` |
+| Website | Next.js 16 (App Router, static export), deployed to GitHub Pages |
 
 ## How it is built
 
